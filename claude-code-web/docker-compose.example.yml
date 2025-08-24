@@ -1,0 +1,64 @@
+version: '3'
+
+services:
+  backend:
+    build: ./backend
+    container_name: claude-code-web-backend
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /path/to/claude-code:/path/to/claude-code:rw
+      - ./tmux-sessions:/app/tmux-sessions
+      - /usr/bin/tmux:/usr/bin/tmux:ro
+      - /tmp:/tmp:rw
+      - /path/to/.bashrc:/root/.bashrc:ro
+      - /run/tmux:/run/tmux:rw
+    privileged: true
+    ports:
+      - "127.0.0.1:5001:5000"  # Exposer le port localement pour debug si nécessaire
+    environment:
+      - AUTH_SECRET=your-secret-key-here
+      - N8N_API_URL=https://your-n8n-url
+      - N8N_API_KEY=your-n8n-api-key
+      - HOST_PATH=/path/to/host
+      - CORS_ALLOW_ORIGINS=https://your-frontend-url,http://localhost
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.claude-api.rule=Host(`your-api-domain.com`)"
+      - "traefik.http.routers.claude-api.entrypoints=websecure"
+      - "traefik.http.routers.claude-api.tls=true"
+      - "traefik.http.routers.claude-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.claude-api.loadbalancer.server.port=5000"
+      - "traefik.docker.network=proxy"
+      # Middleware pour WebSockets et CORS
+      - "traefik.http.middlewares.claude-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS"
+      - "traefik.http.middlewares.claude-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With,Accept"
+      - "traefik.http.middlewares.claude-cors.headers.accesscontrolalloworiginlist=https://your-frontend-url,http://localhost:8080"
+      - "traefik.http.middlewares.claude-cors.headers.accesscontrolmaxage=3600"
+      - "traefik.http.middlewares.claude-cors.headers.addvaryheader=true"
+      - "traefik.http.middlewares.claude-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.routers.claude-api.middlewares=claude-cors"
+
+  frontend:
+    build: ./frontend
+    container_name: claude-code-web-frontend
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.claude.rule=Host(`your-frontend-domain.com`)"
+      - "traefik.http.routers.claude.entrypoints=websecure"
+      - "traefik.http.routers.claude.tls=true"
+      - "traefik.http.routers.claude.tls.certresolver=letsencrypt"
+      - "traefik.http.services.claude.loadbalancer.server.port=80"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.claude.middlewares=secureHeaders@file"
+
+networks:
+  proxy:
+    external: true

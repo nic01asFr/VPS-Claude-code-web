@@ -1,0 +1,92 @@
+# =============================================================================
+# EXCLUSIONS GÉNÉRALES
+# =============================================================================
+
+# Fichiers système
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+.*.swp
+.*.swo
+
+# Fichiers temporaires
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+
+# Exclusions spécifiques au projet
+# Ne garder que le code de Claude Code Web et les exemples
+/*
+!/claude-code-web/
+!/.gitignore
+!/README.md
+!/env.example
+!/CLAUDE.md.example
+!/LICENSE
+
+# Fichiers sensibles dans Claude Code Web
+/claude-code-web/tmux-sessions/
+/claude-code-web/docker-compose.yml
+/claude-code-web/*.env
+/claude-code-web/.env*
+/claude-code-web/frontend/nginx.conf
+
+# Ne pas ignorer les exemples
+!/claude-code-web/docker-compose.example.yml
+
+# Garder les exemples et la documentation
+/claude-code-web/CLAUDE.md
+!/claude-code-web/README.md.example
+
+# =============================================================================
+# PYTHON
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# =============================================================================
+# NODE.JS / VUE.JS
+# =============================================================================
+
+# Modules et dépendances
+/claude-code-web/frontend/node_modules/
+/claude-code-web/frontend/package-lock.json
+/claude-code-web/frontend/npm-debug.log*
+/claude-code-web/frontend/yarn-debug.log*
+/claude-code-web/frontend/yarn-error.log*
+/claude-code-web/frontend/dist/
+
+# =============================================================================
+# SÉCURITÉ
+# =============================================================================
+
+# Clés SSH et certificats
+*.pem
+*.key
+**/id_rsa
+**/id_ed25519
+**/acme.json
+**/certs/
+
+# Fichiers de configuration avec secrets
+.env
+.env.*
+!.env.example

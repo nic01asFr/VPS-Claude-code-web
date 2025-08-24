@@ -1,0 +1,233 @@
+# Claude Code Web
+
+Interface web pour interagir avec Claude Code via un navigateur.
+
+## Architecture
+
+Cette solution permet d'accéder à Claude Code via une interface web moderne, sans avoir besoin d'utiliser Cursor IDE ou une connexion SSH. Elle fonctionne **directement sur le VPS** pour une communication optimale avec les sessions tmux locales.
+
+L'architecture comprend :
+
+- **Backend API** (Python/Flask) : Tourne sur le VPS (port 5000), gère l'authentification, les sessions tmux et la communication avec Claude Code
+- **Frontend** (Vue.js) : Compilé et servi via HTTP server Python (port 5002), interface utilisateur web responsive et moderne
+- **Proxy Nginx** : Conteneur Docker pour router les requêtes de Traefik vers les services VPS
+- **Intégration Traefik** : Exposition sécurisée sur le web avec HTTPS automatique
+
+## Configuration
+
+### Prérequis
+
+- VPS Ubuntu avec Python 3, Node.js et npm installés
+- Traefik configuré comme reverse-proxy
+- Claude Code installé et fonctionnel sur le VPS
+- Accès SSH au VPS pour la configuration
+
+### URLs d'accès
+
+- Interface utilisateur : `https://${FRONTEND_DOMAIN}`
+- API backend : `https://${API_DOMAIN}`
+
+### Identifiants par défaut
+
+Configurez vos identifiants via variables d'environnement :
+- Utilisateur : `${CLAUDE_USERNAME}`
+- Mot de passe : `${CLAUDE_PASSWORD}`
+
+## Variables d'environnement
+
+Créez un fichier `.env` dans le répertoire racine :
+
+```bash
+# Authentification
+CLAUDE_USERNAME=votre_nom_utilisateur
+CLAUDE_PASSWORD=votre_mot_de_passe
+
+# Domaines
+FRONTEND_DOMAIN=votre-domaine-frontend.com
+API_DOMAIN=votre-domaine-api.com
+
+# Configuration VPS
+VPS_IP=votre.ip.vps
+```
+
+## Installation
+
+### Installation automatique
+
+1. Cloner le dépôt dans `/root/docker/claude-code-web`
+2. Configurer les variables d'environnement
+3. Exécuter le script d'installation :
+
+```bash
+cd /root/docker/claude-code-web
+sudo /root/scripts/simple-direct-install.sh
+```
+
+### Installation manuelle
+
+1. **Copier les fichiers** :
+```bash
+sudo cp -r /root/docker/claude-code-web /opt/claude-code-web
+```
+
+2. **Installer le backend** :
+```bash
+cd /opt/claude-code-web/backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt gunicorn gevent gevent-websocket flask-socketio
+deactivate
+```
+
+3. **Compiler le frontend** :
+```bash
+cd /opt/claude-code-web/frontend
+npm install
+npm run build
+```
+
+4. **Démarrer les services** :
+```bash
+# Backend (port 5000)
+cd /opt/claude-code-web/backend
+source venv/bin/activate
+nohup python app.py > /var/log/claude-code-web/backend.log 2>&1 &
+
+# Frontend (port 5002)
+cd /opt/claude-code-web/frontend/dist
+nohup python3 -m http.server 5002 > /var/log/claude-code-web/frontend.log 2>&1 &
+```
+
+## Fonctionnalités
+
+- Authentification sécurisée
+- Interface terminal web
+- Communication en temps réel via WebSockets
+- Intégration avec n8n
+- Gestion des sessions tmux
+- Support multi-utilisateurs
+
+## Structure du projet
+
+```
+claude-code-web/
+├── backend/               # API Flask (déployé sur /opt/claude-code-web/backend)
+│   ├── app.py             # Application principale (port 5000)
+│   ├── requirements.txt   # Dépendances Python
+│   ├── venv/              # Environnement virtuel Python
+│   └── start.sh           # Script de démarrage
+├── frontend/              # Interface Vue.js (déployé sur /opt/claude-code-web/frontend)
+│   ├── src/               # Code source
+│   ├── dist/              # Version compilée (servie sur port 5002)
+│   └── package.json       # Dépendances NPM
+├── docker-compose.yml     # Configuration Docker (services supprimés après migration)
+├── README.md.example      # Documentation template
+└── .env.example           # Exemple de configuration
+```
+
+### Configuration Traefik
+
+Le proxy Nginx dans Docker route les requêtes :
+```
+/root/docker/reverse-proxy/
+├── docker-compose.yml     # Service claude-web-host-proxy
+└── claude-proxy.conf      # Configuration Nginx pour routing
+```
+
+## Configuration système
+
+### Chemins importants
+
+- **Application** : `/opt/claude-code-web/`
+- **Sessions tmux** : `/opt/claude-code-web/tmux-sessions/`
+- **Logs** : `/var/log/claude-code-web/`
+- **Scripts** : `/root/scripts/`
+
+### Ports utilisés
+
+- **Backend API** : `5000` (accessible depuis le proxy Nginx)
+- **Frontend** : `5002` (accessible depuis le proxy Nginx)
+- **Proxy Nginx** : `80` et `8080` (dans le conteneur Docker)
+
+### Configuration Nginx (Proxy)
+
+Le fichier `/root/docker/reverse-proxy/claude-proxy.conf` configure :
+- `${FRONTEND_DOMAIN}` → `http://${VPS_IP}:5002` (Frontend)
+- `${API_DOMAIN}` → `http://${VPS_IP}:5000` (Backend API)
+
+## Sécurité
+
+- Authentification par token JWT
+- HTTPS obligatoire via Traefik
+- Processus utilisateur séparés
+- Sessions tmux isolées par utilisateur
+- Logs sécurisés dans `/var/log/claude-code-web/`
+
+## Maintenance
+
+### Gestion des processus
+
+```bash
+# Vérifier les processus actifs
+ps aux | grep "python.*app.py\|python3.*http.server.*5002"
+
+# Arrêter les services
+pkill -f "python.*app.py"
+pkill -f "python3.*http.server.*5002"
+
+# Redémarrer les services
+cd /opt/claude-code-web/backend && source venv/bin/activate && nohup python app.py &
+cd /opt/claude-code-web/frontend/dist && nohup python3 -m http.server 5002 &
+```
+
+### Logs
+
+```bash
+# Logs du backend
+tail -f /var/log/claude-code-web/backend.log
+
+# Logs du frontend
+tail -f /var/log/claude-code-web/frontend.log
+
+# Logs système
+journalctl -f | grep claude
+```
+
+### Mise à jour
+
+```bash
+# Mettre à jour le frontend
+cd /opt/claude-code-web/frontend
+npm run build
+pkill -f "python3.*http.server.*5002"
+cd dist && nohup python3 -m http.server 5002 &
+
+# Redémarrer le backend
+pkill -f "python.*app.py"
+cd /opt/claude-code-web/backend
+source venv/bin/activate
+nohup python app.py &
+```
+
+## Développement
+
+Pour développer :
+
+1. **Backend** : 
+```bash
+cd /opt/claude-code-web/backend
+source venv/bin/activate
+python app.py
+```
+
+2. **Frontend** :
+```bash
+cd /opt/claude-code-web/frontend
+npm run serve  # Mode développement
+# ou
+npm run build && cd dist && python3 -m http.server 5002  # Mode production
+```
+
+## Licence
+
+Propriétaire - Tous droits réservés

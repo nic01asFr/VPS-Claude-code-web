@@ -1,0 +1,135 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a Docker-based infrastructure project containing multiple services:
+- **claude-code-web**: Web interface for Claude Code interaction via browser
+- **reverse-proxy**: Traefik-based reverse proxy with SSL termination
+- **n8n**: Workflow automation platform
+
+The main application is a web-based Claude Code interface that allows users to interact with Claude Code through a modern web UI instead of requiring Cursor IDE or SSH connections.
+
+## Architecture
+
+### claude-code-web Service
+- **Backend**: Python Flask application with WebSocket support (port 5000)
+- **Frontend**: Vue.js 3 application compiled and served (port 5002)
+- **Communication**: Real-time WebSocket communication for terminal interaction
+- **Sessions**: Tmux session management for isolated user environments
+- **Authentication**: JWT-based authentication with configurable credentials
+
+### Key Components
+- Flask backend handles tmux session creation, WebSocket communication, and API endpoints
+- Vue.js frontend provides a responsive terminal interface
+- Traefik reverse proxy routes traffic with automatic HTTPS via Let's Encrypt
+- Sessions are isolated per user using unique tmux sessions
+
+## Common Commands
+
+### Development
+```bash
+# Frontend development
+cd /opt/claude-code-web/frontend
+npm run serve  # Development mode with hot reload
+npm run build  # Production build
+
+# Backend development  
+cd /opt/claude-code-web/backend
+source venv/bin/activate
+python app.py  # Run Flask development server
+```
+
+### Production Operations
+```bash
+# Check running services
+ps aux | grep "python.*app.py\|python3.*http.server.*5002"
+
+# Start services manually
+cd /opt/claude-code-web/backend && source venv/bin/activate && nohup python app.py > /var/log/claude-code-web/backend.log 2>&1 &
+cd /opt/claude-code-web/frontend/dist && nohup python3 -m http.server 5002 > /var/log/claude-code-web/frontend.log 2>&1 &
+
+# Stop services
+pkill -f "python.*app.py"
+pkill -f "python3.*http.server.*5002"
+
+# View logs
+tail -f /var/log/claude-code-web/backend.log
+tail -f /var/log/claude-code-web/frontend.log
+```
+
+### Docker Operations
+```bash
+# Traefik and reverse proxy
+cd /root/docker/reverse-proxy
+docker-compose up -d
+
+# Check container status
+docker ps
+docker logs <container_name>
+```
+
+## Key File Locations
+
+### Application Files
+- `/opt/claude-code-web/` - Production deployment location
+- `/root/docker/claude-code-web/` - Source code location
+- `/var/log/claude-code-web/` - Application logs
+- `/opt/claude-code-web/tmux-sessions/` - User session data
+
+### Configuration Files
+- `/root/docker/reverse-proxy/claude-proxy.conf` - Nginx proxy configuration
+- `/root/docker/reverse-proxy/config/traefik.yml` - Traefik main configuration
+- `/root/docker/reverse-proxy/config/dynamic/` - Dynamic Traefik configuration
+
+## Authentication
+
+Configure credentials via environment variables:
+- Username: `${CLAUDE_USERNAME}`, Password: `${CLAUDE_PASSWORD}`
+- Username: `admin`, Password: `${ADMIN_PASSWORD}`
+
+Authentication is handled via JWT tokens with 24-hour expiration.
+
+## Development Notes
+
+- The backend creates and manages tmux sessions for each user
+- WebSocket communication handles real-time terminal interaction
+- Sessions are automatically cleaned up on application restart
+- The application runs directly on the VPS (not containerized) for optimal tmux integration
+- Frontend is built using Vue CLI 4.5.x with Vue 3
+- Backend uses Flask-SocketIO for WebSocket support with threading async mode
+
+## Security Considerations
+
+- Application runs with root privileges for tmux access
+- CORS is configured for specific allowed origins
+- JWT tokens are used for session management
+- SSH keys are present in the backend directory for automation
+- Sessions are isolated per user using unique tmux session names
+
+## Network Configuration
+
+- Frontend: `https://${FRONTEND_DOMAIN}` (port 5002 internally)
+- Backend API: `https://${API_DOMAIN}` (port 5000 internally)  
+- Traefik dashboard: `https://${TRAEFIK_DOMAIN}`
+- Nginx proxy routes requests from Traefik to VPS services
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
+
+```bash
+# Authentication
+CLAUDE_USERNAME=your_username
+CLAUDE_PASSWORD=your_password
+ADMIN_PASSWORD=your_admin_password
+
+# Domains
+FRONTEND_DOMAIN=your-frontend-domain.com
+API_DOMAIN=your-api-domain.com
+TRAEFIK_DOMAIN=your-traefik-domain.com
+
+# VPS Configuration
+VPS_IP=your.vps.ip.address
+```
